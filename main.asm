@@ -3,6 +3,10 @@ filename_prompt:    .asciiz "Digite o nome do arquivo: "        # String de prom
 buffer_filename:    .space 80                                   # Buffer de 80 bytes para armazenar o nome do arquivo.
 buffer_line:     .space 4096                                    # Buffer para armazenar a linha do arquivo.
 buffer_byte: .space 1                                           # Buffer para armazenar um byte lido.
+data_string: .asciiz ".data"
+text_string: .asciiz ".text"
+string_text_ok: .asciiz "aqui entrou text\n"
+string_data_ok: .asciiz "aqui entrou data\n"
 
 # Tratamento de erros
 error_file_not_found:	.asciiz "\nArquivo nao encontrado. Verifique se o arquivo esta no mesmo diretorio\n"  # Mensagem de erro se o arquivo não for encontrado.
@@ -40,7 +44,7 @@ main:
     li $s3, 0                      # comprimento da linha atual
     li $s6, 0                      # flag para ignorar linha após '#'
     jal readFile                   # Chama a função para ler o arquivo
-    
+fecharArquivo:    
     # Fechar o arquivo
     li $v0, 16                     # syscall para fechar arquivo
     move $a0, $s6                  # descritor do arquivo
@@ -99,6 +103,20 @@ consumeLine:
     li $s3, 0                      # reseta o comprimento da linha
     li $s6, 0                      # reseta a flag de comentário
     
+    
+    # verifica se a proxima linha eh a secao ".data"
+    la $a2, data_string 	
+    jal whichSection
+    beqz $v0, dataSegment
+    
+    # zera o registrador $v0 para comparar a secao .text
+    li $v0, 0
+    
+    # verifica se a proxima linha eh a secao ".text"
+    la $a2, text_string 
+    jal whichSection
+    beqz $v0, textSegment
+    
     li $v0, 4                      # syscall para imprimir a linha
     move $a0, $s2
     syscall
@@ -110,11 +128,59 @@ consumeLine:
     
     b readFile                     # volta a ler o próximo byte
 
+textSegment:
+    # LOGICA A IMPLEMENTAR: essa parte so imprime uma string 
+    li $v0, 4
+    la $a3, string_text_ok
+    move $a0, $a3
+    syscall
+    jr $ra
+	
+dataSegment:
+    # LOGICA A IMPLEMENTAR: essa parte so imprime uma string 
+    li $v0, 4
+    la $a3, string_data_ok
+    move $a0, $a3
+    syscall
+    jr $ra
+	
+whichSection:
+    # zera os registradores a serem testados
+    li $t0, 0 				
+    li $t1, 0
+
+    # atribui o endereco das memorias para os registradores $t0 e $t1		
+    move $t0, $a2
+    move $t1, $s2
+    j compare_loop
+	
+compare_loop:
+    lb $t2, 0($t0)          		# Carrega o byte atual da primeira string em $t2
+    lb $t3, 0($t1)          		# Carrega o byte atual da segunda string em $t3
+    beq $t2, $zero, end_compare 	# Se $t2 for nulo, chegou ao final da string
+    beq $t2, $t3, next_char 		# Se $t2 == $t3, pula para a próxima comparação de caractere
+    li $v0, 1               		# Define $v0 como 1, strings são diferentes
+    jr $ra
+
+next_char:
+    addi $t0, $t0, 1        # Incrementa o endereço da primeira string
+    addi $t1, $t1, 1        # Incrementa o endereço da segunda string
+    j compare_loop          # Continua a comparação
+
+end_compare:
+    beq $t3, $zero, equal   # Se $t3 também for nulo, as strings são iguais
+    li $v0, 1               # Define $v0 como 1, strings são diferentes
+    jr $ra
+
+equal:
+    li $v0, 0               # Define $v0 como 0, strings são iguais
+    jr $ra
+  
 readDone:
     li $v0, 4                      # syscall para imprimir a linha final
     move $a0, $s2
     syscall
-    jr $ra                         # retorna para o chamador
+    j fecharArquivo
     
 # Procedimento que vai "limpar" o caractere de quebra de linha
 filenameClean:
