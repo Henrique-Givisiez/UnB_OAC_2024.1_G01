@@ -246,6 +246,7 @@ main:
     # Prepara os registradores para o readFile
     la $s1, buffer_byte            # carrega o endereco do buffer_byte no registrador $s1
     la $s2, buffer_line            # carrega o endereco do buffer_line no registrador $s2
+    move $s7, $s2		   # indice inicial do primeiro caractere depois de uma quebra de linha
     li $s3, 0                      # comprimento da linha atual
     li $s6, 0                      # flag para ignorar linha apos '#'
     j readFile                   # Chama a funcao para ler o arquivo
@@ -288,7 +289,8 @@ readFile:
     beq $s4, $t0, consumeLine
     li $t0, 9
     beq $s4, $t0, readFile # remove tab
-  
+    li $t0, 32
+    beq $s4, $t0, readFile # remove espaÁo em branco
     beq $s6, 1, skipByte           # se encontrou '#', ignora o byte atual
     
     # Adiciona o byte na linha atual
@@ -298,12 +300,35 @@ readFile:
     addi $s3, $s3, 1               # incrementa o comprimento da linha
     
     b readFile                     # volta a ler o proximo byte
- 
+
+quebraLinha:
+
+	# verifica se a proxima linha eh a secao ".data"
+	la $a2, data_string 	
+	jal whichSection
+	beqz $v0, dataSegment
+    
+	# zera o registrador $v0 para comparar a secao .text
+	li $v0, 0
+    
+	# verifica se a proxima linha eh a secao ".text"
+	la $a2, text_string 
+	jal whichSection
+	beqz $v0, textSegment
+	
+ 	# pega o endereco de $s5 e copia para $s7. O objetivo È ir copiando o endereco a cada quebra de linha
+	move $s7, $s5 
+	addi $s7, $s7, 1
+	addi $s3, $s3, 1 # contador
+	add $s5, $s3, $s2 # endereco final
+	
 readMemory:
 	la $t1, ($s2) #endereco inicial
 	lb $t2, ($s5) #valor do endereco inicial
-	li $t3, 32
-	beq $t2, $t3, prepara_loop #verifica se caractere atual eh espaco em branco
+    	beq $t2, 10, quebraLinha
+    	beqz $t2, FIM
+    	li $v0, 0
+    	
 	addi $s3, $s3, 1 # contador
 	add $s5, $s3, $s2 # endereco final
 	b readMemory
@@ -375,21 +400,7 @@ consumeLine:
     addi $s3, $s3, 1
     #li $s3, 0                      # reseta o comprimento da linha
     li $s6, 0                      # reseta a flag de coment√°rio
-    
-    
-    # verifica se a proxima linha eh a secao ".data"
-    la $a2, data_string 	
-    jal whichSection
-    beqz $v0, dataSegment
-    
-    # zera o registrador $v0 para comparar a secao .text
-    li $v0, 0
-    
-    # verifica se a proxima linha eh a secao ".text"
-    la $a2, text_string 
-    jal whichSection
-    beqz $v0, textSegment
-    
+
     b readFile                     # volta a ler o proximo byte
 
 textSegment:
@@ -415,7 +426,7 @@ whichSection:
 
     # atribui o endereco das memorias para os registradores $t0 e $t1		
     move $t0, $a2
-    move $t1, $s2
+    move $t1, $s7
     j compare_loop
 	
 compare_loop:
@@ -432,7 +443,8 @@ next_char:
     j compare_loop          # Continua a comparacao
 
 end_compare:
-    beq $t3, $zero, equal   # Se $t3 tambem for nulo, as strings s√£o iguais
+    li $t4, 10
+    beq $t3, $t4, equal   # Se $t3 tambem for nulo, as strings s√£o iguais
     li $v0, 1               # Define $v0 como 1, strings sao diferentes
     jr $ra
 
@@ -445,6 +457,7 @@ readDone:
     li $t3, 0
     li $s3, 0
     li $v0, 0
+    j fecharArquivo
 
 criaArquivos:
 
