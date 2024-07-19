@@ -243,14 +243,13 @@ main:
     slt $t1, $s0, $zero            # verifica se $s0 < 0. Caso verdadeiro, o arquivo nao foi encontrado e $t1 = 1
     beq $t1, 1, fileError          # se $t1 = 1, pula para branch fileError
 
-    jal criaArquivos
-    
     # Prepara os registradores para o readFile
     la $s1, buffer_byte            # carrega o endereco do buffer_byte no registrador $s1
     la $s2, buffer_line            # carrega o endereco do buffer_line no registrador $s2
     li $s3, 0                      # comprimento da linha atual
     li $s6, 0                      # flag para ignorar linha apos '#'
-    jal readFile                   # Chama a funcao para ler o arquivo
+    j readFile                   # Chama a funcao para ler o arquivo
+
 
 fecharArquivo:    
     # Fechar o arquivo
@@ -331,22 +330,22 @@ naoEntrou:
     syscall
     j FIM
     
-# Função de comparação de strings
+# Funï¿½ï¿½o de comparaï¿½ï¿½o de strings
 strcmp:
     lb $t5, 0($a0)       # Carregar byte da string no array
     lb $t4, 0($a1)       # Carregar byte da string alvo
     beqz $t5, check_end  # Se fim da string no array, verificar
     beqz $t4, check_end  # Se fim da string alvo, verificar
-    bne $t5, $t4, strcmp_not_equal # Se diferentes, strings não são iguais
+    bne $t5, $t4, strcmp_not_equal # Se diferentes, strings nï¿½o sï¿½o iguais
     addiu $a0, $a0, 1    # Incrementar ponteiros de ambas strings
     addiu $a1, $a1, 1
-    j strcmp             # Repetir comparação para o próximo caractere
+    j strcmp             # Repetir comparaï¿½ï¿½o para o prï¿½ximo caractere
 
 check_end:
     beq $t5, $t4, strcmp_equal
 
 strcmp_not_equal:
-    li $v0, 1            # Retornar 1 (não iguais)
+    li $v0, 1            # Retornar 1 (nï¿½o iguais)
     jr $ra
     
 strcmp_equal:
@@ -400,7 +399,7 @@ textSegment:
     move $a0, $a3
     syscall
     jr $ra
-    	
+
 dataSegment:
     # LOGICA A IMPLEMENTAR: essa parte so imprime uma string 
     li $v0, 4
@@ -446,8 +445,6 @@ readDone:
     li $t3, 0
     li $s3, 0
     li $v0, 0
-    j fecharArquivo
-
 
 criaArquivos:
 
@@ -463,15 +460,21 @@ criaArquivos:
     # Escrever a string inicial no arquivo de data
     li $v0, 15 # Codigo da chamada de sistema para escrever no arquivo
     move $a0, $s6 # Descritor de arquivo para escrita
-    la $a1, startText # Enderec	o da string a ser escrita
+    la $a1, startText # Endereco da string a ser escrita
     li $a2, 81 # Comprimento da string a ser escrita (ajuste conforme necessario)
     syscall
+
+    # Ler o conteÃºdo da memÃ³ria apontada por $s5 e escrever no arquivo .text
+    move $t0, $s2         # EndereÃ§o da memÃ³ria apontado por $s5
+    li $t1, 0             # indice para percorrer a memÃ³ria
+    
+    jal escreve_conteudo_text
 
     # Fechar o arquivo
     li $v0, 16 # Codigo da chamada de sistema para fechar arquivo
     move $a0, $s6 # Descritor de arquivo a ser fechado
     syscall
-
+	
     # Abrir o arquivo para escrita (ou criar se nÃ£o existir)
     li $v0, 13            # Codigo da chamada de sistema para abrir ou criar arquivo
     la $a0, localArquivoData     # Carregue o endereco da string com o nome do arquivo
@@ -488,14 +491,51 @@ criaArquivos:
     li $a2, 81 # Comprimento da string a ser escrita (ajuste conforme necessario)
     syscall
 
+    # Ler o conteÃºdo da memÃ³ria apontada por $s5 e escrever no arquivo .data
+    move $t0, $s2         # EndereÃ§o da memÃ³ria apontado por $s5
+    li $t1, 0             # indice para percorrer a memÃ³ria
+
+    jal escreve_conteudo_data
+
     # Fechar o arquivo
     li $v0, 16 # Codigo da chamada de sistema para fechar arquivo
     move $a0, $s6 # Descritor de arquivo a ser fechado
     syscall
     
-    jr $ra
+    j fecharArquivo
 
-    
+
+escreve_conteudo_text:
+    lb $t2, 0($t0)        # Ler byte da memÃ³ria
+    beq $t2, $zero, fim_leitura # Se for nulo, fim da leitura
+
+    # Escrever o byte lido no arquivo
+    li $v0, 15            # CÃ³digo da chamada de sistema para escrever no arquivo
+    move $a0, $s6         # Descritor de arquivo para escrita
+    move $a1, $t0         # EndereÃ§o do byte a ser escrito
+    li $a2, 1             # Escrever 1 byte
+    syscall
+
+    addi $t0, $t0, 1      # PrÃ³ximo byte
+    j escreve_conteudo_text
+
+escreve_conteudo_data:
+    lb $t2, 0($t0)        # Ler byte da memÃ³ria
+    beq $t2, $zero, fim_leitura # Se for nulo, fim da leitura
+
+    # Escrever o byte lido no arquivo
+    li $v0, 15            # CÃ³digo da chamada de sistema para escrever no arquivo
+    move $a0, $s6         # Descritor de arquivo para escrita
+    move $a1, $t0         # EndereÃ§o do byte a ser escrito
+    li $a2, 1             # Escrever 1 byte
+    syscall
+
+    addi $t0, $t0, 1      # PrÃ³ximo byte
+    j escreve_conteudo_data
+
+fim_leitura:
+    jr $ra
+        
 # Procedimento que vai "limpar" o caractere de quebra de linha
 filenameClean:
     li $t0, 0                      # Inicializa contador do loop.
